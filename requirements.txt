@@ -1,0 +1,9 @@
+ollama
+networkx
+pyvis
+pydantic
+streamlit
+langchain
+langchain-openai
+langchain-google-genai
+langchain-ollama

@@ -1,0 +1,19 @@
+[theme]
+# Base theme: "light" or "dark"
+base = "dark"
+
+# Primary accent color for interactive elements (buttons, sliders, selected items)
+# Replacing the default Streamlit orange with a vibrant blue
+primaryColor = "#3b82f6"
+
+# Background color for the main content area
+backgroundColor = "#0e1117"
+
+# Background color used for the sidebar and most interactive widgets
+secondaryBackgroundColor = "#1e212b"
+
+# Color used for almost all text
+textColor = "#fafafa"
+
+# Font family ("sans serif", "serif", or "monospace")
+font = "sans serif"

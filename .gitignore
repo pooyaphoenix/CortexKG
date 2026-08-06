@@ -1,0 +1,13 @@
+venv/
+.venv/
+__pycache__
+.vscode
+__pycache__/
+documents/
+frontend/uploads/
+uploads/
+.env
+logs/*.log
+packages/
+app_config.json
+graph_memory.json
