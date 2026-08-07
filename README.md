@@ -1,3 +1,23 @@
+<p align="center">
+<img width="468" height="190" alt="RA3G-logo" src="https://github.com/user-attachments/assets/60e2bf53-e417-4bcb-ae48-12ef268b20da" />
+</p>
+
+<p align="center">
+   <b>CortexKG: Portable AI memory powered by knowledge graphs</b>
+</p>
+
+<p align="center">
+  <a href="https://github.com/pooyaphoenix/CortexKG/releases">
+    <img src="https://img.shields.io/github/v/release/pooyaphoenix/CortexKG?color=blue&label=version" alt="Release Version"/>
+  </a>
+  <a href="https://github.com/pooyaphoenix/CortexKG/stargazers">
+    <img src="https://img.shields.io/github/stars/pooyaphoenix/CortexKG?style=social" alt="GitHub stars"/>
+  </a>
+  <a href="mailto:pooyachavoshi@gmail.com">
+    <img src="https://img.shields.io/badge/Email-Contact-blue?style=flat&logo=gmail" alt="Email"/>
+  </a>
+</p>
+
 # 🧠 CortexKG
 ### Build a Living Knowledge Graph for Your AI Conversations
 
@@ -36,21 +56,6 @@ Instead of only storing text, CortexKG stores **knowledge**.
 
 ---
 
-# Features
-
-- 🧠 Persistent personal knowledge graph
-- 💬 Chat with multiple LLM providers
-- 🌐 Interactive graph visualization
-- 🔄 Automatic knowledge extraction
-- 📦 Export and import your graph as JSON
-- 🔍 Explore relationships between concepts
-- 🧩 Provider-independent architecture
-- ⚡ Streaming responses
-- 🗂 Long-term memory for conversations
-- 🔌 Works with local and cloud models
-
----
-
 # Supported Providers
 
 Currently CortexKG supports:
@@ -70,7 +75,7 @@ Examples include:
 
 ---
 
-# Installation
+# 🚀Installation
 
 ## 1. Clone the repository
 
@@ -121,7 +126,7 @@ The application will automatically launch Streamlit.
 ---
 
 
-# Contributing
+# 🤝Contributing
 
 Contributions are always welcome.
 
