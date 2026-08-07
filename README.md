@@ -1,5 +1,5 @@
 <p align="center">
-<img width="468" height="190" alt="RA3G-logo" src="https://github.com/user-attachments/assets/60e2bf53-e417-4bcb-ae48-12ef268b20da" />
+   <img width="1200" height="800" alt="CortexKG" src="https://github.com/user-attachments/assets/2a57efda-9239-4052-8e35-a2cbdff16a5d" />
 </p>
 
 <p align="center">
