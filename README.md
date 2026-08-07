@@ -1,5 +1,5 @@
 <p align="center">
-   <img width="1200" height="800" alt="CortexKG" src="https://github.com/user-attachments/assets/2a57efda-9239-4052-8e35-a2cbdff16a5d" />
+   <img width="800" height="500" alt="CortexKG" src="https://github.com/user-attachments/assets/2a57efda-9239-4052-8e35-a2cbdff16a5d" />
 </p>
 
 <p align="center">
