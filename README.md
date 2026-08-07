@@ -80,7 +80,7 @@ Examples include:
 ## 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/CortexKG.git
+git clone https://github.com/pooyaphoenix/CortexKG.git
 
 cd CortexKG
 ```

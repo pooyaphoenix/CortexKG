@@ -146,7 +146,6 @@ def render_footer(developer_name: str = "Pooya Chavoshi", github_url: str = "htt
     }}
     </style>
     <div class="app-footer">
-        Developed by <strong>{developer_name}</strong> | 
         <a href="{github_url}" target="_blank">GitHub Profile</a>
     </div>
     """
