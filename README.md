@@ -43,6 +43,7 @@ Over time, your AI assistant develops something closer to a **digital representa
 
 
 # What CortexKG Does
+<img width="800" height="400" alt="Screenshot 2026-08-07 213124" src="https://github.com/user-attachments/assets/5e0f2078-f824-4218-b5a7-7226f0d477b5" />
 
 During every conversation:
 
