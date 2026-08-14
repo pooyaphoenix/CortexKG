@@ -49,11 +49,42 @@ During every conversation:
 1. You chat with your favorite LLM.
 2. CortexKG extracts entities and relationships.
 3. Those relationships are stored inside a knowledge graph.
-4. Future conversations can inject this graph back into the LLM as context.
-5. The graph continuously evolves as you learn and communicate.
+4. You can inspect and manage your stored memories.
+5. Future conversations can inject this graph back into the LLM as context.
+6. The graph continuously evolves as you learn and communicate.
 
 Instead of only storing text, CortexKG stores **knowledge**.
 
+---
+
+# ✨ Features
+
+- 🧠 **Persistent AI Memory** — Store knowledge from conversations as a living knowledge graph.
+- 💬 **Multi-Provider LLM Support** — Ollama, OpenAI, Gemini, and OpenAI-compatible APIs.
+- 🔗 **Interactive Knowledge Graph** — Explore entities and relationships visually.
+- 🗂️ **Memory Control Center** — Search, filter, edit, confirm, reject, and delete memories.
+- ✅ **Memory Review** — Mark extracted memories as confirmed, unreviewed, or rejected.
+- 🔄 **Portable Memory** — Export and import your knowledge graph as JSON.
+- 🔒 **Local-First Support** — Use Ollama for local inference and local memory storage.
+- 🧩 **Graph-Based Context** — Use stored knowledge as context for future LLM conversations.
+
+---
+
+# 🧠 Memory Management
+
+CortexKG gives you direct control over what your AI remembers.
+
+From the **Memory Control Center**, you can:
+
+- 🔎 Search and filter memories
+- ✏️ Edit memory labels and entity types
+- ✅ Confirm memories
+- ❌ Reject memories
+- 🗑️ Delete memories
+- 🔗 Inspect relationships
+- 📊 View memory statistics
+
+This makes CortexKG's memory **transparent, editable, and user-controlled**.
 ---
 
 # Supported Providers

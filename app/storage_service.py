@@ -1,38 +1,71 @@
 import json
 import os
 import networkx as nx
-from graph_service import initialize_graph
 
-# The local file where the graph will be permanently saved
+from graph_service import initialize_graph, ensure_memory_metadata
+
+
 MEMORY_FILE = "graph_memory.json"
+
 
 def save_graph_to_disk(graph) -> None:
     """Saves the current NetworkX graph to a local JSON file."""
     try:
+        ensure_memory_metadata(graph)
+
         data = nx.node_link_data(graph)
+
         with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
     except Exception as e:
         print(f"Error saving graph to disk: {e}")
 
+
 def load_graph_from_disk():
-    """Loads the graph from the local JSON file. If missing, initializes a new one."""
+    """Loads graph from local JSON and adds missing memory metadata."""
+
     if os.path.exists(MEMORY_FILE):
+
         try:
             with open(MEMORY_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            return nx.node_link_graph(data)
+
+            graph = nx.node_link_graph(data)
+
+            ensure_memory_metadata(graph)
+
+            return graph
+
         except Exception as e:
-            print(f"Error loading graph from disk: {e}. Starting fresh.")
-    
+            print(
+                f"Error loading graph from disk: {e}. Starting fresh."
+            )
+
     return initialize_graph()
 
+
 def get_graph_export_json(graph) -> str:
-    """Returns the graph as a formatted JSON string for user download."""
+    """Returns the graph as formatted JSON."""
+
+    ensure_memory_metadata(graph)
+
     data = nx.node_link_data(graph)
-    return json.dumps(data, indent=4)
+
+    return json.dumps(
+        data,
+        indent=4,
+        ensure_ascii=False
+    )
+
 
 def load_graph_from_json(json_str: str):
-    """Converts an uploaded JSON string back into a NetworkX graph."""
+    """Converts uploaded JSON into a NetworkX graph."""
+
     data = json.loads(json_str)
-    return nx.node_link_graph(data)
+
+    graph = nx.node_link_graph(data)
+
+    ensure_memory_metadata(graph)
+
+    return graph
