@@ -195,11 +195,7 @@ This project is licensed under the MIT License.
 
 ---
 
-# Author
-
-**Pooya Chavoshi**
-
-GitHub:
-https://github.com/pooyachavoshi
+Email:
+pooyachavoshi@gmail.com
 
 If you find this project useful, consider giving it a ⭐ to support future development.
