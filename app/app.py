@@ -211,6 +211,27 @@ with tab_chat:
 
         st.subheader("Chat Interface")
 
+        with st.popover(
+            "Clear Chat",
+            use_container_width=True
+        ):
+
+            st.warning(
+                "⚠️ Are you sure? "
+                "This will erase the chat history "
+                "but keep the knowledge graph intact."
+            )
+
+            if st.button(
+                "Yes, Clear Chat",
+                type="primary",
+                use_container_width=True
+            ):
+
+                st.session_state.messages = []
+
+                st.rerun()
+
         for msg in st.session_state.messages:
 
             with st.chat_message(msg["role"]):
