@@ -1,5 +1,7 @@
+import copy
+
 import streamlit as st
-from config_manager import load_config, save_config
+from config_manager import DEFAULT_CONFIG, load_config, save_config
 from llm_service import generate_chat_stream, extract_knowledge
 from graph_service import initialize_graph, update_graph
 from ui_components import render_pyvis_graph, render_footer, render_memory_manager
@@ -162,6 +164,29 @@ if uploaded_file is not None:
         st.sidebar.success("Graph successfully imported!")
     except Exception as e:
         st.sidebar.error("Failed to import graph.")
+
+# --- Reset Settings ---
+st.sidebar.subheader("♻️ Reset Settings")
+
+with st.sidebar.popover(
+    "Reset All Settings",
+    use_container_width=True
+):
+
+    st.warning(
+        "⚠️ Are you sure? "
+        "This will restore every setting to its default value."
+    )
+
+    if st.button(
+        "Yes, Reset Settings",
+        type="primary",
+        use_container_width=True
+    ):
+
+        save_config(copy.deepcopy(DEFAULT_CONFIG))
+
+        st.rerun()
 
 # --- Application Header ---
 st.title("CortexKG: LLM Knowledge Graph Explorer")
