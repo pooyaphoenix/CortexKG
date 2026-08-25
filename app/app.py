@@ -358,6 +358,14 @@ with tab_chat:
 
         st.subheader("Interactive Graph")
 
+        # Recomputed on every rerun (chat/import/clear all trigger
+        # st.rerun), so the counts always mirror session_state.graph.
+        stat_col1, stat_col2 = st.columns(2)
+
+        stat_col1.metric("Nodes", len(st.session_state.graph.nodes))
+
+        stat_col2.metric("Relationships", len(st.session_state.graph.edges))
+
         with st.popover(
             "Clear Graph Memory & Chat",
             use_container_width=True
