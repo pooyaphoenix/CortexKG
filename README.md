@@ -74,6 +74,8 @@ Instead of only storing text, CortexKG stores **knowledge**.
 # 🧠 Memory Management
 
 CortexKG gives you direct control over what your AI remembers.
+<img width="800" height="600" alt="VideoProject7-ezgif com-video-to-gif-converter (1)" src="https://github.com/user-attachments/assets/3764a11d-7f26-436f-adfe-1a9a734751fc" />
+
 
 From the **Memory Control Center**, you can:
 
