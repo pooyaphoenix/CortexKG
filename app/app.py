@@ -37,6 +37,12 @@ def update_provider_setting(provider_name, prop_key, ui_key):
     cfg["providers"][provider_name][prop_key] = st.session_state[ui_key]
     save_config(cfg)
 
+def set_provider_value(provider_name, prop_key, value):
+    """Directly sets a provider config value (used by preset buttons, which aren't tied to a widget key)."""
+    cfg = load_config()
+    cfg["providers"][provider_name][prop_key] = value
+    save_config(cfg)
+    
 # --- Load Configuration ---
 app_cfg = load_config()
 current_provider = app_cfg["provider"]
@@ -55,178 +61,200 @@ if "graph" not in st.session_state:
 # --- Sidebar Options ---
 st.sidebar.title("⚙️ Settings")
 
-st.sidebar.subheader("🤖 Model Provider")
+# ===========================================================
+# Model & Connection — always visible, this is what you need
+# to actually send a message
+# ===========================================================
+with st.sidebar.container(border=True):
 
-# Global Provider Selection
-st.sidebar.selectbox(
-    "Select LLM Provider", 
-    provider_list,
-    index=prov_idx,
-    key="ui_provider",
-    on_change=update_global_setting,
-    args=("provider", "ui_provider")
-)
+    st.subheader("🤖 Model & Connection")
 
-# Re-read active provider from config (in case the selectbox just updated it)
-current_provider = app_cfg["provider"]
-prov_cfg = app_cfg["providers"][current_provider]
+    st.selectbox(
+        "LLM Provider",
+        provider_list,
+        index=prov_idx,
+        key="ui_provider",
+        on_change=update_global_setting,
+        args=("provider", "ui_provider")
+    )
 
-# Provider-Specific Configurations
-st.sidebar.markdown(f"**{current_provider} Settings**")
+    # Re-read active provider from config (in case the selectbox just updated it)
+    current_provider = app_cfg["provider"]
+    prov_cfg = app_cfg["providers"][current_provider]
 
-st.sidebar.text_input(
-    "Model Name", 
-    value=prov_cfg.get("model_name", ""),
-    key=f"ui_{current_provider}_model",
-    on_change=update_provider_setting,
-    args=(current_provider, "model_name", f"ui_{current_provider}_model")
-)
-
-# Show Base URL only for Custom/Compatible endpoints and Ollama
-if current_provider in ["Custom Provider", "Ollama (Local)"]:
-    st.sidebar.text_input(
-        "Base URL", 
-        value=prov_cfg.get("base_url", ""),
-        key=f"ui_{current_provider}_base",
-        help="Custom endpoint (e.g., https://api.arvancloud.ir/v1 or http://localhost:11434)",
+    st.text_input(
+        "Model Name",
+        value=prov_cfg.get("model_name", ""),
+        key=f"ui_{current_provider}_model",
         on_change=update_provider_setting,
-        args=(current_provider, "base_url", f"ui_{current_provider}_base")
+        args=(current_provider, "model_name", f"ui_{current_provider}_model")
     )
 
-# Show API Key for everything EXCEPT local Ollama
-if current_provider != "Ollama (Local)":
-    api_key_val = prov_cfg.get("api_key", "")
-    st.sidebar.text_input(
-        f"API Key", 
-        type="password",
-        value=api_key_val,
-        key=f"ui_{current_provider}_apikey",
+    if current_provider in ["Custom Provider", "Ollama (Local)"]:
+        st.text_input(
+            "Base URL",
+            value=prov_cfg.get("base_url", ""),
+            key=f"ui_{current_provider}_base",
+            help="Custom endpoint (e.g., https://api.arvancloud.ir/v1 or http://localhost:11434)",
+            on_change=update_provider_setting,
+            args=(current_provider, "base_url", f"ui_{current_provider}_base")
+        )
+
+    if current_provider != "Ollama (Local)":
+        api_key_val = prov_cfg.get("api_key", "")
+        st.text_input(
+            "API Key",
+            type="password",
+            value=api_key_val,
+            key=f"ui_{current_provider}_apikey",
+            on_change=update_provider_setting,
+            args=(current_provider, "api_key", f"ui_{current_provider}_apikey")
+        )
+        if not api_key_val and current_provider != "Custom Provider":
+            st.warning("Please enter an API Key to continue.")
+
+# ===========================================================
+# Generation & Prompt — advanced, collapsed by default
+# ===========================================================
+with st.sidebar.expander("🎛️ Generation & Prompt"):
+
+    st.caption("Quick temperature presets")
+    preset_col1, preset_col2, preset_col3 = st.columns(3)
+
+    with preset_col1:
+        if st.button("🎯 Precise", use_container_width=True, help="Sets temperature to 0.2"):
+            set_provider_value(current_provider, "temperature", 0.2)
+            st.rerun()
+
+    with preset_col2:
+        if st.button("⚖️ Balanced", use_container_width=True, help="Sets temperature to 0.7"):
+            set_provider_value(current_provider, "temperature", 0.7)
+            st.rerun()
+
+    with preset_col3:
+        if st.button("🎨 Creative", use_container_width=True, help="Sets temperature to 1.3"):
+            set_provider_value(current_provider, "temperature", 1.3)
+            st.rerun()
+
+    temp_value = float(prov_cfg.get("temperature", 0.7))
+    st.slider(
+        "Temperature",
+        min_value=0.0,
+        max_value=2.0,
+        step=0.1,
+        value=temp_value,
+        key=f"ui_{current_provider}_temperature",
         on_change=update_provider_setting,
-        args=(current_provider, "api_key", f"ui_{current_provider}_apikey")
+        args=(current_provider, "temperature", f"ui_{current_provider}_temperature")
     )
-    if not api_key_val and current_provider != "Custom Provider":
-        st.sidebar.warning("Please enter an API Key to continue.")
+    if temp_value <= 0.3:
+        st.caption("🎯 Focused & deterministic")
+    elif temp_value <= 1.0:
+        st.caption("⚖️ Balanced")
+    else:
+        st.caption("🎨 Creative & varied")
 
-# Generation Parameters (per-provider, so each model can have its own values)
-st.sidebar.slider(
-    "Temperature",
-    min_value=0.0,
-    max_value=2.0,
-    step=0.1,
-    value=float(prov_cfg.get("temperature", 0.7)),
-    key=f"ui_{current_provider}_temperature",
-    help="Lower = more focused and deterministic. Higher = more creative and random.",
-    on_change=update_provider_setting,
-    args=(current_provider, "temperature", f"ui_{current_provider}_temperature")
-)
-
-st.sidebar.number_input(
-    "Max Tokens",
-    min_value=1,
-    max_value=128000,
-    step=64,
-    value=int(prov_cfg.get("max_tokens", 2048)),
-    key=f"ui_{current_provider}_maxtokens",
-    help="Maximum number of tokens the model may generate in a single response.",
-    on_change=update_provider_setting,
-    args=(current_provider, "max_tokens", f"ui_{current_provider}_maxtokens")
-)
-
-st.sidebar.divider()
-
-# Global Settings: Response Level & Extraction
-response_level_opts = ["Short", "Medium", "Long"]
-st.sidebar.select_slider(
-    "Response Detail Level",
-    options=response_level_opts,
-    value=app_cfg["response_level"],
-    key="ui_response_level",
-    on_change=update_global_setting,
-    args=("response_level", "ui_response_level")
-)
-
-graph_src_opts = ["User Input Only", "User Input + Model Response"]
-st.sidebar.radio(
-    "Build Graph From:",
-    options=graph_src_opts,
-    index=graph_src_opts.index(app_cfg["graph_source"]),
-    key="ui_graph_source",
-    on_change=update_global_setting,
-    args=("graph_source", "ui_graph_source")
-)
-
-st.sidebar.divider()
-
-# Global Settings: Custom System Prompt
-st.sidebar.subheader("📝 System Prompt")
-st.sidebar.text_area(
-    "Custom System Prompt (optional)",
-    value=app_cfg.get("system_prompt", ""),
-    key="ui_system_prompt",
-    height=100,
-    placeholder="e.g., You are a senior backend engineer who always replies with concrete code examples.",
-    help="When filled, this replaces the Response Detail Level instruction above. Leave empty to use Response Detail Level instead. Knowledge graph context is still appended automatically when enabled.",
-    on_change=update_global_setting,
-    args=("system_prompt", "ui_system_prompt")
-)
-
-st.sidebar.divider()
-
-# Global Settings: Context Injection
-st.sidebar.subheader("🧠 Context Injection")
-st.sidebar.toggle(
-    "Use Graph as Knowledge Context", 
-    value=app_cfg["use_knowledge"],
-    key="ui_use_knowledge",
-    on_change=update_global_setting,
-    args=("use_knowledge", "ui_use_knowledge")
-)
-
-st.sidebar.divider()
-
-# Graph Memory Controls
-st.sidebar.subheader("💾 Graph Memory")
-graph_json = get_graph_export_json(st.session_state.graph)
-st.sidebar.download_button(
-    label="⬇️ Export Graph as JSON",
-    data=graph_json,
-    file_name="my_knowledge_graph.json",
-    mime="application/json",
-    use_container_width=True
-)
-
-uploaded_file = st.sidebar.file_uploader("⬆️ Import Graph JSON", type=["json"])
-if uploaded_file is not None:
-    try:
-        file_content = uploaded_file.read().decode("utf-8")
-        st.session_state.graph = load_graph_from_json(file_content)
-        save_graph_to_disk(st.session_state.graph)
-        st.sidebar.success("Graph successfully imported!")
-    except Exception as e:
-        st.sidebar.error("Failed to import graph.")
-
-# --- Reset Settings ---
-st.sidebar.subheader("♻️ Reset Settings")
-
-with st.sidebar.popover(
-    "Reset All Settings",
-    use_container_width=True
-):
-
-    st.warning(
-        "⚠️ Are you sure? "
-        "This will restore every setting to its default value."
+    st.number_input(
+        "Max Tokens",
+        min_value=1,
+        max_value=128000,
+        step=64,
+        value=int(prov_cfg.get("max_tokens", 2048)),
+        key=f"ui_{current_provider}_maxtokens",
+        help="Maximum number of tokens the model may generate in a single response.",
+        on_change=update_provider_setting,
+        args=(current_provider, "max_tokens", f"ui_{current_provider}_maxtokens")
     )
 
-    if st.button(
-        "Yes, Reset Settings",
-        type="primary",
+    st.divider()
+
+    response_level_opts = ["Short", "Medium", "Long"]
+    st.select_slider(
+        "Response Detail Level",
+        options=response_level_opts,
+        value=app_cfg["response_level"],
+        key="ui_response_level",
+        help="Ignored whenever a custom System Prompt is set below.",
+        on_change=update_global_setting,
+        args=("response_level", "ui_response_level")
+    )
+
+    system_prompt_val = app_cfg.get("system_prompt", "")
+    st.text_area(
+        "Custom System Prompt (optional)",
+        value=system_prompt_val,
+        key="ui_system_prompt",
+        height=100,
+        placeholder="e.g., You are a senior backend engineer who always replies with concrete code examples.",
+        on_change=update_global_setting,
+        args=("system_prompt", "ui_system_prompt")
+    )
+
+    if system_prompt_val.strip():
+        st.caption("🟢 Using your custom system prompt — overrides Response Detail Level.")
+    else:
+        st.caption("⚪ Using the default prompt based on Response Detail Level.")
+
+# ===========================================================
+# Knowledge Graph Behavior
+# ===========================================================
+with st.sidebar.expander("🧠 Knowledge Graph Behavior"):
+
+    st.toggle(
+        "Use Graph as Knowledge Context",
+        value=app_cfg["use_knowledge"],
+        key="ui_use_knowledge",
+        on_change=update_global_setting,
+        args=("use_knowledge", "ui_use_knowledge")
+    )
+
+    graph_src_opts = ["User Input Only", "User Input + Model Response"]
+    st.radio(
+        "Build Graph From:",
+        options=graph_src_opts,
+        index=graph_src_opts.index(app_cfg["graph_source"]),
+        key="ui_graph_source",
+        on_change=update_global_setting,
+        args=("graph_source", "ui_graph_source")
+    )
+
+# ===========================================================
+# Data & Memory
+# ===========================================================
+with st.sidebar.expander("💾 Data & Memory"):
+
+    graph_json = get_graph_export_json(st.session_state.graph)
+    st.download_button(
+        label="⬇️ Export Graph as JSON",
+        data=graph_json,
+        file_name="my_knowledge_graph.json",
+        mime="application/json",
         use_container_width=True
-    ):
+    )
 
-        save_config(copy.deepcopy(DEFAULT_CONFIG))
+    uploaded_file = st.file_uploader("⬆️ Import Graph JSON", type=["json"])
+    if uploaded_file is not None:
+        try:
+            file_content = uploaded_file.read().decode("utf-8")
+            st.session_state.graph = load_graph_from_json(file_content)
+            save_graph_to_disk(st.session_state.graph)
+            st.success("Graph successfully imported!")
+        except Exception as e:
+            st.error("Failed to import graph.")
 
-        st.rerun()
+    st.divider()
+    st.markdown("**♻️ Danger Zone**")
+
+    with st.popover("Reset All Settings", use_container_width=True):
+
+        st.warning(
+            "⚠️ Are you sure? "
+            "This will restore every setting to its default value."
+        )
+
+        if st.button("Yes, Reset Settings", type="primary", use_container_width=True):
+            save_config(copy.deepcopy(DEFAULT_CONFIG))
+            st.rerun()
 
 # --- Application Header ---
 st.title("CortexKG: LLM Knowledge Graph Explorer")
