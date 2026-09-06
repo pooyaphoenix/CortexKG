@@ -27,6 +27,10 @@
 
 ## Why CortexKG?
 
+
+https://github.com/user-attachments/assets/3b3ed74f-f3cf-4d5d-88cf-af9caef9eeb8
+
+
 Large Language Models are incredibly powerful, but they have one major limitation:
 
 They don't truly **know you**.
