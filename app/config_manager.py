@@ -13,26 +13,35 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "response_level": "Medium",
     "graph_source": "User Input Only",
     "use_knowledge": True,
+    "system_prompt": "",
     "providers": {
         "Ollama (Local)": {
             "model_name": "gemma3:4b",
             "base_url": "http://localhost:11434",
-            "api_key": ""
+            "api_key": "",
+            "temperature": 0.7,
+            "max_tokens": 2048
         },
         "Custom Provider": {
             "model_name": "gpt-5",
             "base_url": "",
-            "api_key": ""
+            "api_key": "",
+            "temperature": 0.7,
+            "max_tokens": 2048
         },
         "OpenAI": {
             "model_name": "gpt-4o-mini",
             "base_url": "",
-            "api_key": ""
+            "api_key": "",
+            "temperature": 0.7,
+            "max_tokens": 2048
         },
         "Google Gemini": {
             "model_name": "gemini-1.5-flash",
             "base_url": "",
-            "api_key": ""
+            "api_key": "",
+            "temperature": 0.7,
+            "max_tokens": 2048
         }
     }
 }
@@ -46,20 +55,21 @@ def load_config() -> Dict[str, Any]:
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                
+
             config = copy.deepcopy(DEFAULT_CONFIG)
-            
-            # Deep merge provider-specific settings
+
+            # Deep merge provider-specific settings (also backfills new keys like
+            # temperature/max_tokens for configs saved before this feature existed)
             if "providers" in data:
                 for p_name, p_data in data["providers"].items():
                     if p_name in config["providers"] and isinstance(p_data, dict):
                         config["providers"][p_name].update(p_data)
-            
+
             # Merge top-level global settings
-            for key in ["provider", "response_level", "graph_source", "use_knowledge"]:
+            for key in ["provider", "response_level", "graph_source", "use_knowledge", "system_prompt"]:
                 if key in data:
                     config[key] = data[key]
-                    
+
             return config
         except Exception as e:
             print(f"Warning: Failed to load {CONFIG_FILE}. Using defaults. Error: {e}")

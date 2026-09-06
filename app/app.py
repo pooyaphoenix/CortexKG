@@ -107,6 +107,31 @@ if current_provider != "Ollama (Local)":
     if not api_key_val and current_provider != "Custom Provider":
         st.sidebar.warning("Please enter an API Key to continue.")
 
+# Generation Parameters (per-provider, so each model can have its own values)
+st.sidebar.slider(
+    "Temperature",
+    min_value=0.0,
+    max_value=2.0,
+    step=0.1,
+    value=float(prov_cfg.get("temperature", 0.7)),
+    key=f"ui_{current_provider}_temperature",
+    help="Lower = more focused and deterministic. Higher = more creative and random.",
+    on_change=update_provider_setting,
+    args=(current_provider, "temperature", f"ui_{current_provider}_temperature")
+)
+
+st.sidebar.number_input(
+    "Max Tokens",
+    min_value=1,
+    max_value=128000,
+    step=64,
+    value=int(prov_cfg.get("max_tokens", 2048)),
+    key=f"ui_{current_provider}_maxtokens",
+    help="Maximum number of tokens the model may generate in a single response.",
+    on_change=update_provider_setting,
+    args=(current_provider, "max_tokens", f"ui_{current_provider}_maxtokens")
+)
+
 st.sidebar.divider()
 
 # Global Settings: Response Level & Extraction
@@ -128,6 +153,21 @@ st.sidebar.radio(
     key="ui_graph_source",
     on_change=update_global_setting,
     args=("graph_source", "ui_graph_source")
+)
+
+st.sidebar.divider()
+
+# Global Settings: Custom System Prompt
+st.sidebar.subheader("📝 System Prompt")
+st.sidebar.text_area(
+    "Custom System Prompt (optional)",
+    value=app_cfg.get("system_prompt", ""),
+    key="ui_system_prompt",
+    height=100,
+    placeholder="e.g., You are a senior backend engineer who always replies with concrete code examples.",
+    help="When filled, this replaces the Response Detail Level instruction above. Leave empty to use Response Detail Level instead. Knowledge graph context is still appended automatically when enabled.",
+    on_change=update_global_setting,
+    args=("system_prompt", "ui_system_prompt")
 )
 
 st.sidebar.divider()
@@ -256,6 +296,21 @@ with tab_chat:
                 ""
             )
 
+            active_temperature = prov_cfg.get(
+                "temperature",
+                0.7
+            )
+
+            active_max_tokens = prov_cfg.get(
+                "max_tokens",
+                2048
+            )
+
+            active_system_prompt = app_cfg.get(
+                "system_prompt",
+                ""
+            )
+
             if (
                 current_provider in
                 ["OpenAI", "Google Gemini"]
@@ -302,7 +357,10 @@ with tab_chat:
                         base_url=active_base_url,
                         response_level=app_cfg["response_level"],
                         use_knowledge=app_cfg["use_knowledge"],
-                        graph=st.session_state.graph
+                        graph=st.session_state.graph,
+                        temperature=active_temperature,
+                        max_tokens=active_max_tokens,
+                        system_prompt=active_system_prompt
                     )
 
                     for chunk in stream:
