@@ -2,6 +2,7 @@ import streamlit as st
 from pyvis.network import Network
 import streamlit.components.v1 as components
 import networkx as nx
+import json
 
 def render_pyvis_graph(nx_graph: nx.DiGraph, height: int = 600):
     """Generates HTML file with Pyvis and renders it into Streamlit with full-screen controls."""
@@ -118,6 +119,190 @@ def render_pyvis_graph(nx_graph: nx.DiGraph, height: int = 600):
         html_content += fullscreen_script
 
     components.html(html_content, height=height + 25)
+
+def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: bool = True):
+    """Renders the knowledge graph as an interactive 3D force-directed graph
+    with node and relationship labels always visible (via three-spritetext)."""
+    if len(nx_graph.nodes) == 0:
+        st.info("The Knowledge Graph is empty. Start chatting to build it!")
+        return
+
+    status_colors = {
+        "confirmed": "#22c55e",
+        "unreviewed": "#eab308",
+        "rejected": "#ef4444",
+    }
+
+    nodes_json = []
+    for node_id, data in nx_graph.nodes(data=True):
+        status = data.get("status", "unreviewed")
+        nodes_json.append({
+            "id": str(node_id),
+            "label": str(data.get("label", node_id)),
+            "entity_type": str(data.get("entity_type", "unknown")),
+            "status": status,
+            "color": status_colors.get(status, "#60a5fa"),
+            "degree": nx_graph.degree(node_id),
+        })
+
+    links_json = []
+    for source, target, data in nx_graph.edges(data=True):
+        links_json.append({
+            "source": str(source),
+            "target": str(target),
+            "relation": data.get("label", "RELATED_TO"),
+        })
+
+    graph_data_json = json.dumps({"nodes": nodes_json, "links": links_json})
+
+    html_template = """
+    <div id="graph3d-wrap" style="width:100%; height:__H__px; position:relative; background:#0e1117; border-radius:8px; overflow:hidden;">
+        <button class="g3d-btn g3d-fs" onclick="g3dToggleFullscreen()">⛶ Fullscreen</button>
+        <button class="g3d-btn g3d-reset" onclick="g3dResetCamera()">🎯 Reset View</button>
+        <div class="g3d-legend">
+            <span><i style="background:#22c55e;"></i> Confirmed</span>
+            <span><i style="background:#eab308;"></i> Unreviewed</span>
+            <span><i style="background:#ef4444;"></i> Rejected</span>
+        </div>
+        <div class="g3d-count" id="g3d-count"></div>
+        <div id="g3d-canvas"></div>
+    </div>
+
+    <style>
+        .g3d-btn {
+            position: absolute; top: 12px; z-index: 9999;
+            background-color: #1f2937; color: #fff; border: 1px solid #374151;
+            padding: 6px 14px; border-radius: 6px; font-family: sans-serif;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .g3d-btn:hover { background-color: #374151; }
+        .g3d-fs { right: 12px; }
+        .g3d-reset { right: 140px; }
+        .g3d-legend {
+            position: absolute; top: 12px; left: 12px; z-index: 9999;
+            background-color: rgba(31,41,55,0.85); padding: 6px 10px; border-radius: 6px;
+            font-family: sans-serif; font-size: 12px; color: #d1d5db; display: flex; gap: 10px;
+        }
+        .g3d-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+        .g3d-count {
+            position: absolute; bottom: 12px; left: 12px; z-index: 9999;
+            color: #9ca3af; font-family: sans-serif; font-size: 12px;
+            background-color: rgba(31,41,55,0.7); padding: 4px 10px; border-radius: 6px;
+        }
+        :fullscreen #graph3d-wrap, :-webkit-full-screen #graph3d-wrap {
+            width: 100vw !important; height: 100vh !important; border-radius: 0 !important;
+        }
+    </style>
+
+    <script type="module">
+        import ForceGraph3D from "https://esm.sh/3d-force-graph";
+        import SpriteText from "https://esm.sh/three-spritetext";
+
+        const graphData = __DATA__;
+        const showEdgeLabels = __EDGE_LABELS__;
+        const elem = document.getElementById('g3d-canvas');
+
+        const Graph = new ForceGraph3D(elem)
+            .graphData(graphData)
+            .backgroundColor('#0e1117')
+            .nodeColor(n => n.color)
+            .nodeVal(n => Math.max(2, Math.sqrt(n.degree + 1) * 3))
+            .nodeOpacity(0.95)
+            .nodeLabel(n => `<div style="font-family:sans-serif;padding:4px;">
+                                <b>${n.label}</b><br/>
+                                <span style="color:#9ca3af;">${n.entity_type} · ${n.status}</span>
+                              </div>`)
+            .nodeThreeObjectExtend(true)
+            .nodeThreeObject(node => {
+                const sprite = new SpriteText(node.label);
+                sprite.material.depthWrite = false;
+                sprite.color = node.color;
+                sprite.textHeight = 3.2;
+                sprite.center.y = -0.9;
+                return sprite;
+            })
+            .linkColor(() => 'rgba(148,163,184,0.55)')
+            .linkDirectionalArrowLength(4)
+            .linkDirectionalArrowRelPos(1)
+            .linkDirectionalParticles(1)
+            .linkDirectionalParticleWidth(1.5)
+            .linkDirectionalParticleSpeed(0.006)
+            .linkWidth(1)
+            .width(elem.parentElement.clientWidth)
+            .height(__H__)
+            .onNodeClick(node => {
+                const distance = 80;
+                const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
+                Graph.cameraPosition(
+                    { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+                    node,
+                    1000
+                );
+            })
+            .onNodeHover(node => { elem.style.cursor = node ? 'pointer' : 'default'; });
+
+        if (showEdgeLabels) {
+            Graph.linkThreeObjectExtend(true)
+                .linkThreeObject(link => {
+                    const sprite = new SpriteText(link.relation);
+                    sprite.color = 'lightgrey';
+                    sprite.textHeight = 2.2;
+                    return sprite;
+                })
+                .linkPositionUpdate((sprite, { start, end }) => {
+                    const middlePos = Object.assign(...['x', 'y', 'z'].map(c => ({
+                        [c]: start[c] + (end[c] - start[c]) / 2
+                    })));
+                    Object.assign(sprite.position, middlePos);
+                });
+        }
+
+        let autoRotate = true;
+        Graph.controls().addEventListener('start', () => { autoRotate = false; });
+
+        (function spin() {
+            if (autoRotate) { Graph.scene().rotation.y += 0.0015; }
+            requestAnimationFrame(spin);
+        })();
+
+        document.getElementById('g3d-count').innerText =
+            graphData.nodes.length + ' entities · ' + graphData.links.length + ' relationships';
+
+        window.g3dToggleFullscreen = function() {
+            const c = document.getElementById('graph3d-wrap');
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                (c.requestFullscreen || c.webkitRequestFullscreen).call(c);
+            } else {
+                (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+            }
+        };
+
+        document.addEventListener('fullscreenchange', g3dResize);
+        document.addEventListener('webkitfullscreenchange', g3dResize);
+
+        function g3dResize() {
+            setTimeout(() => {
+                const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+                Graph.width(isFS ? window.innerWidth : elem.parentElement.clientWidth);
+                Graph.height(isFS ? window.innerHeight : __H__);
+            }, 150);
+        }
+
+        window.g3dResetCamera = function() {
+            Graph.cameraPosition({ x: 0, y: 0, z: 300 }, { x: 0, y: 0, z: 0 }, 1000);
+            autoRotate = true;
+        };
+    </script>
+    """
+
+    html_content = (
+        html_template
+        .replace("__DATA__", graph_data_json)
+        .replace("__EDGE_LABELS__", "true" if show_edge_labels else "false")
+        .replace("__H__", str(height))
+    )
+    components.html(html_content, height=height + 40)
 
 def render_memory_manager(nx_graph):
     """

@@ -4,7 +4,7 @@ import streamlit as st
 from config_manager import DEFAULT_CONFIG, load_config, save_config
 from llm_service import generate_chat_stream, extract_knowledge
 from graph_service import initialize_graph, update_graph
-from ui_components import render_pyvis_graph, render_footer, render_memory_manager
+from ui_components import render_pyvis_graph, render_3d_graph, render_footer, render_memory_manager
 from storage_service import (
     save_graph_to_disk, 
     load_graph_from_disk, 
@@ -42,7 +42,7 @@ def set_provider_value(provider_name, prop_key, value):
     cfg = load_config()
     cfg["providers"][provider_name][prop_key] = value
     save_config(cfg)
-    
+
 # --- Load Configuration ---
 app_cfg = load_config()
 current_provider = app_cfg["provider"]
@@ -260,254 +260,154 @@ with st.sidebar.expander("💾 Data & Memory"):
 st.title("CortexKG: LLM Knowledge Graph Explorer")
 st.markdown(f"Provider: **`{current_provider}`** | Model: **`{prov_cfg.get('model_name','')}`**")
 
-tab_chat, tab_memory = st.tabs(
+tab_chat, tab_graph, tab_memory = st.tabs(
     [
         "💬 Chat",
+        "🕸️ Graph",
         "🧠 Memory"
     ]
 )
 
 with tab_chat:
 
-    col1, col2 = st.columns([1, 1])
+    st.subheader("Chat Interface")
 
-    # ---------------------------------------------------------
-    # Chat
-    # ---------------------------------------------------------
+    with st.popover("Clear Chat", use_container_width=True):
+        st.warning(
+            "⚠️ Are you sure? "
+            "This will erase the chat history "
+            "but keep the knowledge graph intact."
+        )
+        if st.button("Yes, Clear Chat", type="primary", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
-    with col1:
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-        st.subheader("Chat Interface")
+    if prompt := st.chat_input("What would you like to discuss?"):
 
-        with st.popover(
-            "Clear Chat",
-            use_container_width=True
-        ):
+        active_model = prov_cfg.get("model_name", "")
+        active_api_key = prov_cfg.get("api_key", "")
+        active_base_url = prov_cfg.get("base_url", "")
+        active_temperature = prov_cfg.get("temperature", 0.7)
+        active_max_tokens = prov_cfg.get("max_tokens", 2048)
+        active_system_prompt = app_cfg.get("system_prompt", "")
 
-            st.warning(
-                "⚠️ Are you sure? "
-                "This will erase the chat history "
-                "but keep the knowledge graph intact."
-            )
+        if current_provider in ["OpenAI", "Google Gemini"] and not active_api_key:
+            st.error(f"Cannot send message: {current_provider} API Key is missing.")
+            st.stop()
 
-            if st.button(
-                "Yes, Clear Chat",
-                type="primary",
-                use_container_width=True
-            ):
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-                st.session_state.messages = []
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-                st.rerun()
+        with st.chat_message("assistant"):
 
-        for msg in st.session_state.messages:
+            response_placeholder = st.empty()
+            full_response = ""
 
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+            api_messages = [
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+            ]
 
-        if prompt := st.chat_input(
-            "What would you like to discuss?"
-        ):
-
-            active_model = prov_cfg.get(
-                "model_name",
-                ""
-            )
-
-            active_api_key = prov_cfg.get(
-                "api_key",
-                ""
-            )
-
-            active_base_url = prov_cfg.get(
-                "base_url",
-                ""
-            )
-
-            active_temperature = prov_cfg.get(
-                "temperature",
-                0.7
-            )
-
-            active_max_tokens = prov_cfg.get(
-                "max_tokens",
-                2048
-            )
-
-            active_system_prompt = app_cfg.get(
-                "system_prompt",
-                ""
-            )
-
-            if (
-                current_provider in
-                ["OpenAI", "Google Gemini"]
-                and not active_api_key
-            ):
-                st.error(
-                    f"Cannot send message: "
-                    f"{current_provider} API Key is missing."
+            try:
+                stream = generate_chat_stream(
+                    messages=api_messages,
+                    provider=current_provider,
+                    model_name=active_model,
+                    api_key=active_api_key,
+                    base_url=active_base_url,
+                    response_level=app_cfg["response_level"],
+                    use_knowledge=app_cfg["use_knowledge"],
+                    graph=st.session_state.graph,
+                    temperature=active_temperature,
+                    max_tokens=active_max_tokens,
+                    system_prompt=active_system_prompt
                 )
 
-                st.stop()
+                for chunk in stream:
+                    if hasattr(chunk, "content"):
+                        full_response += chunk.content
+                        response_placeholder.markdown(full_response + "▌")
 
-            st.session_state.messages.append(
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            )
+                response_placeholder.markdown(full_response)
 
-            with st.chat_message("user"):
-                st.markdown(prompt)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-            with st.chat_message("assistant"):
+                with st.spinner("Extracting knowledge graph..."):
 
-                response_placeholder = st.empty()
-                full_response = ""
+                    text_to_extract = f"User: {prompt}"
 
-                api_messages = [
-                    {
-                        "role": m["role"],
-                        "content": m["content"]
-                    }
+                    if app_cfg["graph_source"] == "User Input + Model Response":
+                        text_to_extract = f"User: {prompt}\nAssistant: {full_response}"
 
-                    for m in st.session_state.messages
-                ]
-
-                try:
-
-                    stream = generate_chat_stream(
-                        messages=api_messages,
+                    extracted_kg = extract_knowledge(
+                        text=text_to_extract,
                         provider=current_provider,
                         model_name=active_model,
                         api_key=active_api_key,
-                        base_url=active_base_url,
-                        response_level=app_cfg["response_level"],
-                        use_knowledge=app_cfg["use_knowledge"],
-                        graph=st.session_state.graph,
-                        temperature=active_temperature,
-                        max_tokens=active_max_tokens,
-                        system_prompt=active_system_prompt
+                        base_url=active_base_url
                     )
 
-                    for chunk in stream:
+                    st.session_state.graph = update_graph(st.session_state.graph, extracted_kg)
+                    save_graph_to_disk(st.session_state.graph)
+                    st.rerun()
 
-                        if hasattr(chunk, "content"):
+            except Exception as err:
+                st.error(f"Error communicating with {current_provider}: {err}")
+                st.session_state.messages.pop()
 
-                            full_response += chunk.content
 
-                            response_placeholder.markdown(
-                                full_response + "▌"
-                            )
+with tab_graph:
 
-                    response_placeholder.markdown(
-                        full_response
-                    )
+    st.subheader("Interactive Knowledge Graph")
 
-                    st.session_state.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": full_response
-                        }
-                    )
+    ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([2, 1, 1])
 
-                    with st.spinner(
-                        "Extracting knowledge graph..."
-                    ):
-
-                        text_to_extract = (
-                            f"User: {prompt}"
-                        )
-
-                        if (
-                            app_cfg["graph_source"]
-                            == "User Input + Model Response"
-                        ):
-                            text_to_extract = (
-                                f"User: {prompt}\n"
-                                f"Assistant: {full_response}"
-                            )
-
-                        extracted_kg = extract_knowledge(
-                            text=text_to_extract,
-                            provider=current_provider,
-                            model_name=active_model,
-                            api_key=active_api_key,
-                            base_url=active_base_url
-                        )
-
-                        st.session_state.graph = update_graph(
-                            st.session_state.graph,
-                            extracted_kg
-                        )
-
-                        save_graph_to_disk(
-                            st.session_state.graph
-                        )
-
-                        st.rerun()
-
-                except Exception as err:
-
-                    st.error(
-                        f"Error communicating with "
-                        f"{current_provider}: {err}"
-                    )
-
-                    st.session_state.messages.pop()
-
-    # ---------------------------------------------------------
-    # Graph
-    # ---------------------------------------------------------
-
-    with col2:
-
-        st.subheader("Interactive Graph")
-
-        with st.popover(
-            "Clear Graph Memory & Chat",
-            use_container_width=True
-        ):
-
+    with ctrl_col1:
+        with st.popover("Clear Graph Memory & Chat", use_container_width=True):
             st.warning(
                 "⚠️ Are you sure? "
                 "This will permanently wipe the active "
                 "knowledge graph and chat history."
             )
-
-            if st.button(
-                "Yes, Clear Everything",
-                type="primary",
-                use_container_width=True
-            ):
-
+            if st.button("Yes, Clear Everything", type="primary", use_container_width=True):
                 st.session_state.graph = initialize_graph()
-
-                save_graph_to_disk(
-                    st.session_state.graph
-                )
-
+                save_graph_to_disk(st.session_state.graph)
                 st.session_state.messages = []
-
                 st.rerun()
 
-        render_pyvis_graph(
-            st.session_state.graph
+    with ctrl_col2:
+        if "graph_view_mode" not in st.session_state:
+            st.session_state.graph_view_mode = "3D"
+        st.session_state.graph_view_mode = st.radio(
+            "View",
+            ["3D", "2D"],
+            horizontal=True,
+            label_visibility="collapsed",
+            index=0 if st.session_state.graph_view_mode == "3D" else 1
         )
+
+    with ctrl_col3:
+        show_edge_labels = st.checkbox("🏷️ Relationship Labels", value=True)
+
+    if st.session_state.graph_view_mode == "3D":
+        render_3d_graph(st.session_state.graph, height=700, show_edge_labels=show_edge_labels)
+        st.caption("🖱️ Drag to rotate · Scroll to zoom · Click a node to focus")
+    else:
+        render_pyvis_graph(st.session_state.graph, height=700)
+
 
 with tab_memory:
 
-    st.session_state.graph, memory_changed = render_memory_manager(
-        st.session_state.graph
-    )
+    st.session_state.graph, memory_changed = render_memory_manager(st.session_state.graph)
 
     if memory_changed:
-
-        save_graph_to_disk(
-            st.session_state.graph
-        )
-
+        save_graph_to_disk(st.session_state.graph)
         st.rerun()
 
 
