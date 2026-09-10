@@ -25,6 +25,14 @@
 
 ---
 
+## 🎥 Demo
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/dfb5dada-c815-4103-b9c0-6bc01c1bfeb0" alt="CortexKG Demo" width="900" />
+</p>
+
+---
+
 ## Why CortexKG?
 
 Large Language Models are incredibly powerful, but they have one major limitation:
