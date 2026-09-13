@@ -28,7 +28,7 @@
 ## 🎥 Demo
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dfb5dada-c815-4103-b9c0-6bc01c1bfeb0" alt="CortexKG Demo" width="900" />
+  <img src="https://github.com/user-attachments/assets/2cc3ab27-3456-4280-9276-25c20320bb17" alt="CortexKG Demo" width="900" />
 </p>
 
 ---
