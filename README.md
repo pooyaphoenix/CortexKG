@@ -53,25 +53,91 @@ During every conversation:
 
 1. You chat with your favorite LLM.
 2. CortexKG extracts entities and relationships.
-3. Those relationships are stored inside a knowledge graph.
-4. You can inspect and manage your stored memories.
+3. Those relationships are stored inside a knowledge graph — **with a timestamp recording exactly when each piece of knowledge was learned**.
+4. You can inspect, explore, and manage your stored memories.
 5. Future conversations can inject this graph back into the LLM as context.
 6. The graph continuously evolves as you learn and communicate.
 
-Instead of only storing text, CortexKG stores **knowledge**.
+Instead of only storing text, CortexKG stores **knowledge** — and remembers *when* it learned it.
 
 ---
 
 # ✨ Features
 
+### Memory & Knowledge
 - 🧠 **Persistent AI Memory** — Store knowledge from conversations as a living knowledge graph.
-- 💬 **Multi-Provider LLM Support** — Ollama, OpenAI, Gemini, and OpenAI-compatible APIs.
-- 🔗 **Interactive Knowledge Graph** — Explore entities and relationships visually.
-- 🗂️ **Memory Control Center** — Search, filter, edit, confirm, reject, and delete memories.
+- ⏱️ **Temporal Memory** — Every entity and relationship is timestamped with when it was first learned and last mentioned.
+- 🗂️ **Memory Control Center** — Search, filter, sort, edit, confirm, reject, and delete memories.
 - ✅ **Memory Review** — Mark extracted memories as confirmed, unreviewed, or rejected.
 - 🔄 **Portable Memory** — Export and import your knowledge graph as JSON.
-- 🔒 **Local-First Support** — Use Ollama for local inference and local memory storage.
 - 🧩 **Graph-Based Context** — Use stored knowledge as context for future LLM conversations.
+
+### Visualization
+- 🌐 **3D Knowledge Graph Explorer** — Orbit, zoom, and fly through your knowledge in three dimensions.
+- 🏷️ **Always-Visible Labels** — Entity and relationship names render directly in the scene, no hovering required.
+- ⏳ **Timeline Scrubber & Playback** — Rewind your graph to any point in time and watch it grow chronologically.
+- 🎨 **Dual Color Modes** — Color nodes by review status or by age.
+- 📊 **Knowledge Timeline Panel** — Chart of new entities learned per day, plus a full chronological log.
+- 🔀 **2D / 3D Toggle** — Switch back to the classic 2D view anytime.
+
+### Models & Control
+- 💬 **Multi-Provider LLM Support** — Ollama, OpenAI, Gemini, and OpenAI-compatible APIs.
+- 🌡️ **Per-Provider Generation Settings** — Independent temperature and max token limits for each provider.
+- 📝 **Custom System Prompt** — Define your own system instruction, or fall back to built-in detail levels.
+- 🔒 **Local-First Support** — Use Ollama for local inference and local memory storage.
+
+---
+
+# 🌐 3D Knowledge Graph Explorer
+
+Your knowledge graph is rendered as an interactive 3D force-directed graph using **Three.js / WebGL**, giving dense clusters room to separate in a way flat 2D layouts can't.
+
+**Exploration controls:**
+
+| Action | Control |
+|---|---|
+| Rotate | Drag |
+| Zoom | Scroll |
+| Pan | Right-drag |
+| Focus an entity | Click a node — the camera flies to it |
+| Reset camera | 🎯 Reset View |
+| Expand | ⛶ Fullscreen |
+
+**Visual encoding:**
+
+- **Node color** — review status (✅ confirmed / 🟡 unreviewed / ❌ rejected), switchable to age-based coloring
+- **Node size** — number of connections, so hub entities stand out immediately
+- **Directional arrows and flowing particles** — relationship direction at a glance
+- **Floating labels** — entity names and relationship types always readable
+
+Prefer the flat view for very dense graphs? The 2D renderer is one toggle away.
+
+---
+
+# ⏳ Temporal Memory
+
+Knowing *what* your AI remembers is useful. Knowing *when* it learned it is what makes that memory auditable.
+
+Every node and edge in the graph carries:
+
+- **`created_at`** — when this knowledge first entered the graph
+- **`updated_at`** — the most recent conversation that mentioned it
+- **`mention_count`** — how many times it has come up
+
+### Time-Travel Scrubber
+
+The 3D view includes a timeline control at the bottom of the canvas. Drag the slider to rewind the graph to any moment in its history, or press **▶** to watch your knowledge assemble itself chronologically from the first entity to the most recent.
+
+Rather than rebuilding the layout on every frame, the scrubber toggles node visibility — so the graph stays spatially stable while entities fade in over time.
+
+### Knowledge Timeline Panel
+
+Below the graph, an expandable timeline panel shows:
+
+- A bar chart of how many new entities you learned per day
+- A full chronological log with first-seen, last-mentioned, and mention counts for every entity
+
+> **Note on existing graphs:** knowledge captured before this feature was added is honestly labelled `unknown` rather than backfilled with a fabricated date. Those entries remain permanently visible on the timeline scrubber.
 
 ---
 
@@ -85,14 +151,54 @@ CortexKG gives you direct control over what your AI remembers.
 From the **Memory Control Center**, you can:
 
 - 🔎 Search and filter memories
+- 🔃 Sort by recently updated, recently created, most mentioned, or name
 - ✏️ Edit memory labels and entity types
 - ✅ Confirm memories
 - ❌ Reject memories
 - 🗑️ Delete memories
-- 🔗 Inspect relationships
+- 🔗 Inspect relationships, including when each was first seen
+- 📅 See when each memory was first learned and last mentioned
 - 📊 View memory statistics
 
 This makes CortexKG's memory **transparent, editable, and user-controlled**.
+
+---
+
+# ⚙️ Configuration
+
+All settings live in the sidebar and persist to `app_config.json` automatically — no restart required.
+
+### 🤖 Model & Connection
+Always visible. Pick your provider, model name, and connection details.
+
+| Setting | Description |
+|---|---|
+| LLM Provider | Ollama, OpenAI, Google Gemini, or a custom OpenAI-compatible endpoint |
+| Model Name | Per-provider model identifier |
+| Base URL | For Ollama and custom endpoints |
+| API Key | Stored per provider, so you can switch without re-entering keys |
+
+### 🎛️ Generation & Prompt
+
+| Setting | Description |
+|---|---|
+| Temperature | `0.0` – `2.0`, stored per provider. One-click presets: 🎯 Precise · ⚖️ Balanced · 🎨 Creative |
+| Max Tokens | Response length cap, mapped to each backend's native parameter |
+| Response Detail Level | Short / Medium / Long built-in instructions |
+| Custom System Prompt | Your own instruction — overrides Response Detail Level when filled in |
+
+Max tokens is translated correctly for each backend: `max_tokens` for OpenAI-compatible APIs, `max_output_tokens` for Gemini, and `num_predict` for Ollama.
+
+### 🧠 Knowledge Graph Behavior
+
+| Setting | Description |
+|---|---|
+| Use Graph as Knowledge Context | Inject stored entities and relationships into the system prompt |
+| Build Graph From | Extract from user input only, or user input plus model responses |
+
+### 💾 Data & Memory
+Export your graph as JSON, import a previous export, or reset all settings to defaults.
+
 ---
 
 # Supported Providers
@@ -162,8 +268,9 @@ python main.py
 
 The application will automatically launch Streamlit.
 
----
+> The 3D graph renderer loads client-side from a CDN, so it adds **no Python dependencies** to your environment.
 
+---
 
 # 🤝Contributing
 
@@ -177,6 +284,7 @@ Whether it's:
 - documentation
 - graph algorithms
 - memory optimization
+- entity resolution and deduplication
 
 Feel free to open an issue or submit a pull request.
 
