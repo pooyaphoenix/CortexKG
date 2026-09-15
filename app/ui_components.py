@@ -121,11 +121,14 @@ def render_pyvis_graph(nx_graph: nx.DiGraph, height: int = 600):
     components.html(html_content, height=height + 25)
 
 def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: bool = True):
-    """Renders the knowledge graph as an interactive 3D force-directed graph
-    with node and relationship labels always visible (via three-spritetext)."""
+    """Renders the knowledge graph in 3D with always-on labels and a time-travel scrubber."""
+    from time_service import ensure_timestamps, to_epoch_ms, format_timestamp
+
     if len(nx_graph.nodes) == 0:
         st.info("The Knowledge Graph is empty. Start chatting to build it!")
         return
+
+    ensure_timestamps(nx_graph)
 
     status_colors = {
         "confirmed": "#22c55e",
@@ -134,8 +137,11 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
     }
 
     nodes_json = []
+    node_ms = {}
     for node_id, data in nx_graph.nodes(data=True):
         status = data.get("status", "unreviewed")
+        ms = to_epoch_ms(data.get("created_at"))
+        node_ms[node_id] = ms
         nodes_json.append({
             "id": str(node_id),
             "label": str(data.get("label", node_id)),
@@ -143,14 +149,26 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
             "status": status,
             "color": status_colors.get(status, "#60a5fa"),
             "degree": nx_graph.degree(node_id),
+            "ts": ms,
+            "created": format_timestamp(data.get("created_at")),
+            "updated": format_timestamp(data.get("updated_at")),
+            "mentions": int(data.get("mention_count") or 0),
         })
 
     links_json = []
     for source, target, data in nx_graph.edges(data=True):
+        # A link can only appear once both its endpoints exist, so its effective
+        # timeline position is the latest of (edge, source node, target node).
+        candidates = [
+            v for v in (to_epoch_ms(data.get("created_at")), node_ms.get(source), node_ms.get(target))
+            if v is not None
+        ]
         links_json.append({
             "source": str(source),
             "target": str(target),
             "relation": data.get("label", "RELATED_TO"),
+            "ts": max(candidates) if candidates else None,
+            "created": format_timestamp(data.get("created_at")),
         })
 
     graph_data_json = json.dumps({"nodes": nodes_json, "links": links_json})
@@ -165,6 +183,12 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
             <span><i style="background:#ef4444;"></i> Rejected</span>
         </div>
         <div class="g3d-count" id="g3d-count"></div>
+        <div class="g3d-timeline" id="g3d-timeline" style="display:none;">
+            <button class="g3d-tl-btn" id="g3d-play">▶</button>
+            <input type="range" id="g3d-slider" min="0" max="1000" value="1000">
+            <span class="g3d-tl-label" id="g3d-time"></span>
+            <button class="g3d-tl-btn g3d-tl-mode" id="g3d-mode">🎨 Status</button>
+        </div>
         <div id="g3d-canvas"></div>
     </div>
 
@@ -186,9 +210,28 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
         }
         .g3d-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
         .g3d-count {
-            position: absolute; bottom: 12px; left: 12px; z-index: 9999;
+            position: absolute; top: 48px; left: 12px; z-index: 9999;
             color: #9ca3af; font-family: sans-serif; font-size: 12px;
             background-color: rgba(31,41,55,0.7); padding: 4px 10px; border-radius: 6px;
+        }
+        .g3d-timeline {
+            position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; width: min(80%, 720px);
+            background-color: rgba(31,41,55,0.9); border: 1px solid #374151;
+            padding: 8px 12px; border-radius: 8px;
+            display: flex; align-items: center; gap: 10px;
+            font-family: sans-serif; box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        }
+        .g3d-tl-btn {
+            background-color: #374151; color: #fff; border: none;
+            padding: 4px 10px; border-radius: 5px; cursor: pointer;
+            font-size: 13px; font-weight: 600; white-space: nowrap;
+        }
+        .g3d-tl-btn:hover { background-color: #4b5563; }
+        .g3d-tl-mode { font-size: 12px; }
+        #g3d-slider { flex: 1; accent-color: #60a5fa; cursor: pointer; }
+        .g3d-tl-label {
+            color: #d1d5db; font-size: 12px; min-width: 112px; text-align: center; white-space: nowrap;
         }
         :fullscreen #graph3d-wrap, :-webkit-full-screen #graph3d-wrap {
             width: 100vw !important; height: 100vh !important; border-radius: 0 !important;
@@ -203,16 +246,36 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
         const showEdgeLabels = __EDGE_LABELS__;
         const elem = document.getElementById('g3d-canvas');
 
+        // ---- Timeline bounds -------------------------------------------------
+        const stamps = graphData.nodes.map(n => n.ts).filter(v => v !== null);
+        const minTs = stamps.length ? stamps.reduce((a, b) => Math.min(a, b)) : 0;
+        const maxTs = stamps.length ? stamps.reduce((a, b) => Math.max(a, b)) : 0;
+        const hasTimeline = stamps.length > 0 && maxTs > minTs;
+        let cursor = maxTs;
+        let colorMode = 'status';
+
+        function ageColor(n) {
+            if (n.ts === null) return '#475569';
+            const t = maxTs === minTs ? 1 : (n.ts - minTs) / (maxTs - minTs);
+            // oldest = cool blue, newest = warm amber
+            const r = Math.round(59 + t * (251 - 59));
+            const g = Math.round(130 + t * (191 - 130));
+            const b = Math.round(246 + t * (36 - 246));
+            return 'rgb(' + r + ',' + g + ',' + b + ')';
+        }
+
         const Graph = new ForceGraph3D(elem)
             .graphData(graphData)
             .backgroundColor('#0e1117')
-            .nodeColor(n => n.color)
+            .nodeColor(n => colorMode === 'status' ? n.color : ageColor(n))
             .nodeVal(n => Math.max(2, Math.sqrt(n.degree + 1) * 3))
             .nodeOpacity(0.95)
             .nodeLabel(n => `<div style="font-family:sans-serif;padding:4px;">
                                 <b>${n.label}</b><br/>
-                                <span style="color:#9ca3af;">${n.entity_type} · ${n.status}</span>
-                              </div>`)
+                                <span style="color:#9ca3af;">${n.entity_type} · ${n.status}</span><br/>
+                                <span style="color:#9ca3af;">First seen: ${n.created}</span><br/>
+                                <span style="color:#9ca3af;">Last mentioned: ${n.updated} (${n.mentions}x)</span>
+                             </div>`)
             .nodeThreeObjectExtend(true)
             .nodeThreeObject(node => {
                 const sprite = new SpriteText(node.label);
@@ -223,6 +286,7 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
                 return sprite;
             })
             .linkColor(() => 'rgba(148,163,184,0.55)')
+            .linkLabel(l => `${l.relation} · ${l.created}`)
             .linkDirectionalArrowLength(4)
             .linkDirectionalArrowRelPos(1)
             .linkDirectionalParticles(1)
@@ -258,6 +322,71 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
                 });
         }
 
+        // ---- Visibility filtering (keeps layout stable, unlike re-setting graphData) ----
+        const countEl = document.getElementById('g3d-count');
+        const timeEl = document.getElementById('g3d-time');
+
+        function visibleNode(n) { return n.ts === null || n.ts <= cursor; }
+        function visibleLink(l) { return l.ts === null || l.ts <= cursor; }
+
+        function applyFilter() {
+            Graph.nodeVisibility(visibleNode).linkVisibility(visibleLink);
+            const nv = graphData.nodes.filter(visibleNode).length;
+            const lv = graphData.links.filter(visibleLink).length;
+            countEl.innerText = nv + ' / ' + graphData.nodes.length + ' entities · '
+                              + lv + ' / ' + graphData.links.length + ' relationships';
+            if (hasTimeline) {
+                timeEl.innerText = new Date(cursor).toLocaleString(undefined, {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            }
+        }
+
+        if (hasTimeline) {
+            document.getElementById('g3d-timeline').style.display = 'flex';
+
+            const slider = document.getElementById('g3d-slider');
+            const playBtn = document.getElementById('g3d-play');
+            const modeBtn = document.getElementById('g3d-mode');
+            let playing = false;
+            let timer = null;
+
+            slider.addEventListener('input', () => {
+                cursor = minTs + (maxTs - minTs) * (slider.value / 1000);
+                applyFilter();
+            });
+
+            function stop() {
+                playing = false;
+                playBtn.innerText = '▶';
+                if (timer) { clearInterval(timer); timer = null; }
+            }
+
+            playBtn.addEventListener('click', () => {
+                if (playing) { stop(); return; }
+                playing = true;
+                playBtn.innerText = '⏸';
+                if (Number(slider.value) >= 1000) { slider.value = 0; }
+                timer = setInterval(() => {
+                    let v = Number(slider.value) + 12;
+                    if (v >= 1000) { v = 1000; stop(); }
+                    slider.value = v;
+                    cursor = minTs + (maxTs - minTs) * (v / 1000);
+                    applyFilter();
+                }, 60);
+            });
+
+            modeBtn.addEventListener('click', () => {
+                colorMode = (colorMode === 'status') ? 'age' : 'status';
+                modeBtn.innerText = (colorMode === 'status') ? '🎨 Status' : '🕰️ Age';
+                Graph.nodeColor(n => colorMode === 'status' ? n.color : ageColor(n));
+            });
+        }
+
+        applyFilter();
+
+        // ---- Camera / view helpers ------------------------------------------
         let autoRotate = true;
         Graph.controls().addEventListener('start', () => { autoRotate = false; });
 
@@ -265,9 +394,6 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
             if (autoRotate) { Graph.scene().rotation.y += 0.0015; }
             requestAnimationFrame(spin);
         })();
-
-        document.getElementById('g3d-count').innerText =
-            graphData.nodes.length + ' entities · ' + graphData.links.length + ' relationships';
 
         window.g3dToggleFullscreen = function() {
             const c = document.getElementById('graph3d-wrap');
@@ -304,6 +430,35 @@ def render_3d_graph(nx_graph: nx.DiGraph, height: int = 700, show_edge_labels: b
     )
     components.html(html_content, height=height + 40)
 
+def render_timeline_panel(nx_graph):
+    """Chronological view of when knowledge entered the graph."""
+    import pandas as pd
+    from time_service import get_timeline_events, get_daily_counts
+
+    if len(nx_graph.nodes) == 0:
+        return
+
+    events = get_timeline_events(nx_graph)
+    daily = get_daily_counts(nx_graph)
+
+    st.markdown("#### 📅 Knowledge Timeline")
+
+    if daily:
+        st.caption("New entities learned per day")
+        chart_df = pd.DataFrame(
+            {"Entities learned": list(daily.values())},
+            index=list(daily.keys())
+        )
+        st.bar_chart(chart_df)
+    else:
+        st.info(
+            "No dated entities yet. Knowledge captured before this feature was added "
+            "shows as 'unknown' — new entries from now on will be timestamped."
+        )
+
+    st.caption("Chronological log (newest first)")
+    st.dataframe(events, use_container_width=True, hide_index=True)
+
 def render_memory_manager(nx_graph):
     """
     Interactive memory management interface.
@@ -321,8 +476,14 @@ def render_memory_manager(nx_graph):
         delete_memory,
         ensure_memory_metadata,
     )
+    from time_service import (
+        ensure_timestamps,
+        format_timestamp,
+        relative_time,
+    )
 
     ensure_memory_metadata(nx_graph)
+    ensure_timestamps(nx_graph)
 
     changed = False
 
@@ -348,10 +509,10 @@ def render_memory_manager(nx_graph):
     st.divider()
 
     # ---------------------------------------------------------
-    # Filters
+    # Filters & Sorting
     # ---------------------------------------------------------
 
-    filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
+    filter_col1, filter_col2, filter_col3, filter_col4 = st.columns([2, 1, 1, 1])
 
     with filter_col1:
         search = st.text_input(
@@ -383,6 +544,17 @@ def render_memory_manager(nx_graph):
             ]
         )
 
+    with filter_col4:
+        sort_choice = st.selectbox(
+            "Sort by",
+            [
+                "Recently updated",
+                "Recently created",
+                "Most mentioned",
+                "Name (A–Z)"
+            ]
+        )
+
     # ---------------------------------------------------------
     # Memory list
     # ---------------------------------------------------------
@@ -400,6 +572,26 @@ def render_memory_manager(nx_graph):
         st.info("No memories match the current filters.")
         return nx_graph, changed
 
+    # Apply the chosen ordering. Entries with no timestamp (captured before
+    # time tracking existed) sort to the bottom via the "" fallback.
+    if sort_choice == "Recently updated":
+        memories.sort(
+            key=lambda m: nx_graph.nodes[m["id"]].get("updated_at") or "",
+            reverse=True
+        )
+    elif sort_choice == "Recently created":
+        memories.sort(
+            key=lambda m: nx_graph.nodes[m["id"]].get("created_at") or "",
+            reverse=True
+        )
+    elif sort_choice == "Most mentioned":
+        memories.sort(
+            key=lambda m: int(nx_graph.nodes[m["id"]].get("mention_count") or 0),
+            reverse=True
+        )
+    else:
+        memories.sort(key=lambda m: str(m["label"]).lower())
+
     memory_options = {}
 
     for memory in memories:
@@ -410,11 +602,14 @@ def render_memory_manager(nx_graph):
             "rejected": "❌",
         }.get(memory["status"], "⚪")
 
+        node_meta = nx_graph.nodes[memory["id"]]
+
         display = (
             f"{status_icon} "
             f"{memory['label']} "
             f"· {memory['entity_type']} "
-            f"· {memory['degree']} connections"
+            f"· {memory['degree']} connections "
+            f"· {relative_time(node_meta.get('updated_at'))}"
         )
 
         memory_options[display] = memory["id"]
@@ -472,6 +667,23 @@ def render_memory_manager(nx_graph):
             st.text_input(
                 "Current Status",
                 value=current_status,
+                disabled=True
+            )
+
+            st.text_input(
+                "First Seen",
+                value=format_timestamp(
+                    node_data.get("created_at")
+                ),
+                disabled=True
+            )
+
+            st.text_input(
+                "Last Mentioned",
+                value=(
+                    f"{format_timestamp(node_data.get('updated_at'))} "
+                    f"({int(node_data.get('mention_count') or 0)} mentions)"
+                ),
                 disabled=True
             )
 
@@ -617,6 +829,12 @@ def render_memory_manager(nx_graph):
                 "Relation": data.get(
                     "label",
                     "RELATED_TO"
+                ),
+                "First Seen": format_timestamp(
+                    data.get("created_at")
+                ),
+                "Mentions": int(
+                    data.get("mention_count") or 0
                 )
             }
         )
@@ -640,6 +858,12 @@ def render_memory_manager(nx_graph):
                 "Relation": data.get(
                     "label",
                     "RELATED_TO"
+                ),
+                "First Seen": format_timestamp(
+                    data.get("created_at")
+                ),
+                "Mentions": int(
+                    data.get("mention_count") or 0
                 )
             }
         )

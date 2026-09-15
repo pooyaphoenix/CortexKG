@@ -4,14 +4,14 @@ import streamlit as st
 from config_manager import DEFAULT_CONFIG, load_config, save_config
 from llm_service import generate_chat_stream, extract_knowledge
 from graph_service import initialize_graph, update_graph
-from ui_components import render_pyvis_graph, render_3d_graph, render_footer, render_memory_manager
+from ui_components import render_timeline_panel, render_pyvis_graph, render_3d_graph, render_footer, render_memory_manager
 from storage_service import (
     save_graph_to_disk, 
     load_graph_from_disk, 
     get_graph_export_json, 
     load_graph_from_json
 )
-
+from time_service import capture_snapshot, stamp_graph_changes, ensure_timestamps
 st.set_page_config(page_title="CortexKG: LLM Knowledge Graph Explorer", layout="wide")
 
 # --- Hide Streamlit Default UI ---
@@ -57,6 +57,7 @@ if "messages" not in st.session_state:
 
 if "graph" not in st.session_state:
     st.session_state.graph = load_graph_from_disk()
+    ensure_timestamps(st.session_state.graph)
 
 # --- Sidebar Options ---
 st.sidebar.title("⚙️ Settings")
@@ -237,6 +238,7 @@ with st.sidebar.expander("💾 Data & Memory"):
         try:
             file_content = uploaded_file.read().decode("utf-8")
             st.session_state.graph = load_graph_from_json(file_content)
+            ensure_timestamps(st.session_state.graph)
             save_graph_to_disk(st.session_state.graph)
             st.success("Graph successfully imported!")
         except Exception as e:
@@ -353,7 +355,13 @@ with tab_chat:
                         base_url=active_base_url
                     )
 
+                    # Record what existed BEFORE the merge, so new knowledge can be dated
+                    snapshot = capture_snapshot(st.session_state.graph)
+
                     st.session_state.graph = update_graph(st.session_state.graph, extracted_kg)
+
+                    stamp_graph_changes(st.session_state.graph, snapshot, extracted_kg)
+
                     save_graph_to_disk(st.session_state.graph)
                     st.rerun()
 
@@ -397,9 +405,12 @@ with tab_graph:
 
     if st.session_state.graph_view_mode == "3D":
         render_3d_graph(st.session_state.graph, height=700, show_edge_labels=show_edge_labels)
-        st.caption("🖱️ Drag to rotate · Scroll to zoom · Click a node to focus")
+        st.caption("🖱️ Drag to rotate · Scroll to zoom · Click a node to focus · ▶ Play to replay how the graph grew")
     else:
         render_pyvis_graph(st.session_state.graph, height=700)
+
+    with st.expander("📅 Knowledge Timeline", expanded=False):
+        render_timeline_panel(st.session_state.graph)
 
 
 with tab_memory:
