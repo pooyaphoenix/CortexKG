@@ -24,11 +24,11 @@
 > Transform your conversations into a persistent knowledge graph and give LLMs long-term memory based on **your own knowledge**, relationships, and personal context.
 
 ---
-
+> 🇮🇷 **Persian Documentation:** [مطالعه مستندات فارسی](README.fa.md)
 ## Why CortexKG?
 
 
-https://github.com/user-attachments/assets/3b3ed74f-f3cf-4d5d-88cf-af9caef9eeb8
+https://github.com/user-attachments/assets/8352ae65-4f48-4247-a014-95fd9ff23fd8
 
 
 Large Language Models are incredibly powerful, but they have one major limitation:
