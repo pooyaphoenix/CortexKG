@@ -24,7 +24,7 @@
 > Transform your conversations into a persistent knowledge graph and give LLMs long-term memory based on **your own knowledge**, relationships, and personal context.
 
 ---
-> 🇮🇷 **Persian Documentation:** [مطالعه مستندات فارسی](README.fa.md)
+> **Persian Documentation:** [مطالعه مستندات فارسی](README.fa.md)
 ## Why CortexKG?
 
 https://github.com/user-attachments/assets/1029c9cf-2a2a-4a6d-9700-3730d4d936fb
