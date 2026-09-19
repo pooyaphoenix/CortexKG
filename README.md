@@ -27,9 +27,7 @@
 > 🇮🇷 **Persian Documentation:** [مطالعه مستندات فارسی](README.fa.md)
 ## Why CortexKG?
 
-
-https://github.com/user-attachments/assets/8352ae65-4f48-4247-a014-95fd9ff23fd8
-
+https://github.com/user-attachments/assets/1029c9cf-2a2a-4a6d-9700-3730d4d936fb
 
 Large Language Models are incredibly powerful, but they have one major limitation:
 
