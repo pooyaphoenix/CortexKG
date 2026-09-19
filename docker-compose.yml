@@ -1,0 +1,36 @@
+services:
+  cortexkg:
+    build: .
+    container_name: cortexkg
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persists app_config.json, the saved knowledge graph, and graph.html
+      # across restarts/rebuilds — remove the volume to reset to defaults.
+      - cortexkg_data:/data
+    extra_hosts:
+      # Lets "host.docker.internal" resolve on Linux too (Docker Desktop on
+      # Mac/Windows already supports it natively). In the app's sidebar,
+      # set Ollama (Local) Base URL to "http://host.docker.internal:11434"
+      # to reach an Ollama install running on your host machine —
+      # "localhost" from inside the container means the container itself.
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # Optional: run Ollama in its own container instead of relying on the
+  # host. Uncomment this service and the `ollama_data` volume below, then
+  # set Base URL in CortexKG's sidebar to "http://ollama:11434" — services
+  # on the same Compose network reach each other by service name.
+  #
+  # ollama:
+  #   image: ollama/ollama
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+
+volumes:
+  cortexkg_data:
+  # ollama_data:

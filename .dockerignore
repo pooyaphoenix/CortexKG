@@ -1,0 +1,22 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Local runtime data — contains API keys and personal graph data.
+# Must never be baked into a shared image. Adjust the graph filename
+# below if storage_service.py writes to a different one.
+app_config.json
+graph.html
+knowledge_graph.json
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store

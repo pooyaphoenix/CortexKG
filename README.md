@@ -221,8 +221,24 @@ Examples include:
 ---
 
 # 🚀Installation
+## 1. 🐳 Run with Docker (Recommended)
 
-## 1. Clone the repository
+```bash
+git clone https://github.com/pooyaphoenix/CortexKG.git
+cd CortexKG
+docker compose up -d
+```
+
+Open **http://localhost:8501**. Settings, API keys, and your knowledge graph all
+persist in a Docker volume across restarts.
+
+> **Using Ollama?** From inside the container, `localhost` refers to the
+> container itself. Set the Ollama Base URL in Settings to
+> `http://host.docker.internal:11434` to reach an Ollama instance running on
+> your host machine — or uncomment the optional `ollama` service in
+> `docker-compose.yml` to run it fully containerized instead.
+
+## 2. Clone the repository
 
 ```bash
 git clone https://github.com/pooyaphoenix/CortexKG.git
