@@ -69,7 +69,8 @@ Instead of only storing text, CortexKG stores **knowledge** — and remembers *w
 - ✅ **Memory Review** — Mark extracted memories as confirmed, unreviewed, or rejected.
 - 🔄 **Portable Memory** — Export and import your knowledge graph as JSON.
 - 🧩 **Graph-Based Context** — Use stored knowledge as context for future LLM conversations.
-
+### Database Integration
+- 🔗 **Neo4j Graph Database Support** — Optionally connect CortexKG to a live Neo4j instance to store, sync, and query your knowledge graph at scale.
 ### Visualization
 - 🌐 **3D Knowledge Graph Explorer** — Orbit, zoom, and fly through your knowledge in three dimensions.
 - 🏷️ **Always-Visible Labels** — Entity and relationship names render directly in the scene, no hovering required.
@@ -86,6 +87,25 @@ Instead of only storing text, CortexKG stores **knowledge** — and remembers *w
 
 ---
 
+# 🔗 Neo4j Database Integration
+
+In addition to local JSON storage, CortexKG supports real-time synchronization with **Neo4j** graph databases.
+
+### Setting Up Neo4j
+1. Expand the **🔗 Neo4j Database** section in the sidebar.
+2. Toggle **Enable Neo4j Storage** on.
+3. Configure your connection details (**URI**, **Database Name** e.g., `cortexKG`, **Username**, and **Password**).
+4. Click **Test Connection** and then **Sync Graph with Neo4j** to persist your nodes and relationships.
+
+### Inspecting Data in Neo4j Browser
+Once synced, you can explore and query your knowledge graph directly inside the Neo4j Workspace using Cypher:
+
+* **View all nodes:**
+  ```cypher
+  MATCH (n) RETURN n
+* **View nodes and edges:**
+  ```cypher
+  MATCH (n)-[r]->(m) RETURN n, r, m
 # 🌐 3D Knowledge Graph Explorer
 
 Your knowledge graph is rendered as an interactive 3D force-directed graph using **Three.js / WebGL**, giving dense clusters room to separate in a way flat 2D layouts can't.
