@@ -7,3 +7,4 @@ langchain
 langchain-openai
 langchain-google-genai
 langchain-ollama
+neo4j>=5.0

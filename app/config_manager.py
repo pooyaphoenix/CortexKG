@@ -7,13 +7,20 @@ from typing import Dict, Any
 CONFIG_FILE = "app_config.json"
 _lock = threading.Lock()
 
-# Define nested defaults for each provider
+# Define nested defaults for each provider and Neo4j
 DEFAULT_CONFIG: Dict[str, Any] = {
     "provider": "Ollama (Local)",
     "response_level": "Medium",
     "graph_source": "User Input Only",
     "use_knowledge": True,
     "system_prompt": "",
+    "neo4j": {
+        "enabled": False,
+        "uri": "bolt://localhost:7687",
+        "username": "neo4j",
+        "password": "",
+        "database": "neo4j"
+    },
     "providers": {
         "Ollama (Local)": {
             "model_name": "gemma3:4b",
@@ -47,7 +54,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 def load_config() -> Dict[str, Any]:
-    """Reads configuration from JSON file with a deep-merge for nested provider settings."""
+    """Reads configuration from JSON file with a deep-merge for nested provider and neo4j settings."""
     with _lock:
         if not os.path.exists(CONFIG_FILE):
             _save_unlocked(DEFAULT_CONFIG)
@@ -58,12 +65,15 @@ def load_config() -> Dict[str, Any]:
 
             config = copy.deepcopy(DEFAULT_CONFIG)
 
-            # Deep merge provider-specific settings (also backfills new keys like
-            # temperature/max_tokens for configs saved before this feature existed)
+            # Deep merge provider-specific settings
             if "providers" in data:
                 for p_name, p_data in data["providers"].items():
                     if p_name in config["providers"] and isinstance(p_data, dict):
                         config["providers"][p_name].update(p_data)
+
+            # Deep merge neo4j settings
+            if "neo4j" in data and isinstance(data["neo4j"], dict):
+                config["neo4j"].update(data["neo4j"])
 
             # Merge top-level global settings
             for key in ["provider", "response_level", "graph_source", "use_knowledge", "system_prompt"]:

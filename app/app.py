@@ -12,6 +12,7 @@ from storage_service import (
     load_graph_from_json
 )
 from time_service import capture_snapshot, stamp_graph_changes, ensure_timestamps
+from database_service import load_graph_from_neo4j, save_graph_to_neo4j, test_neo4j_connection
 st.set_page_config(page_title="CortexKG: LLM Knowledge Graph Explorer", layout="wide")
 
 # --- Hide Streamlit Default UI ---
@@ -43,6 +44,12 @@ def set_provider_value(provider_name, prop_key, value):
     cfg["providers"][provider_name][prop_key] = value
     save_config(cfg)
 
+def update_neo4j_setting(prop_key, ui_key):
+    """Saves Neo4j configuration changes."""
+    cfg = load_config()
+    cfg["neo4j"][prop_key] = st.session_state[ui_key]
+    save_config(cfg)
+
 # --- Load Configuration ---
 app_cfg = load_config()
 current_provider = app_cfg["provider"]
@@ -56,7 +63,13 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "graph" not in st.session_state:
-    st.session_state.graph = load_graph_from_disk()
+    # Check if Neo4j is enabled and load from it if available, else load from disk
+    if app_cfg.get("neo4j", {}).get("enabled", False):
+        st.session_state.graph = load_graph_from_neo4j(app_cfg)
+        if len(st.session_state.graph.nodes) == 0:
+            st.session_state.graph = load_graph_from_disk()
+    else:
+        st.session_state.graph = load_graph_from_disk()
     ensure_timestamps(st.session_state.graph)
 
 # --- Sidebar Options ---
@@ -257,6 +270,65 @@ with st.sidebar.expander("💾 Data & Memory"):
         if st.button("Yes, Reset Settings", type="primary", use_container_width=True):
             save_config(copy.deepcopy(DEFAULT_CONFIG))
             st.rerun()
+# ===========================================================
+# Neo4j Database Integration
+# ===========================================================
+with st.sidebar.expander("🔗 Neo4j Database"):
+    neo4j_cfg = app_cfg.get("neo4j", {})
+    
+    st.toggle(
+        "Enable Neo4j Storage",
+        value=neo4j_cfg.get("enabled", False),
+        key="ui_neo4j_enabled",
+        on_change=lambda: [update_neo4j_setting("enabled", "ui_neo4j_enabled"), st.rerun()]
+    )
+    
+    st.text_input(
+        "URI",
+        value=neo4j_cfg.get("uri", "bolt://localhost:7687"),
+        key="ui_neo4j_uri",
+        on_change=update_neo4j_setting,
+        args=("uri", "ui_neo4j_uri")
+    )
+    
+    st.text_input(
+        "Database Name",
+        value=neo4j_cfg.get("database", "neo4j"),
+        key="ui_neo4j_db",
+        on_change=update_neo4j_setting,
+        args=("database", "ui_neo4j_db")
+    )
+    
+    st.text_input(
+        "Username",
+        value=neo4j_cfg.get("username", "neo4j"),
+        key="ui_neo4j_user",
+        on_change=update_neo4j_setting,
+        args=("username", "ui_neo4j_user")
+    )
+    
+    st.text_input(
+        "Password",
+        type="password",
+        value=neo4j_cfg.get("password", ""),
+        key="ui_neo4j_pass",
+        on_change=update_neo4j_setting,
+        args=("password", "ui_neo4j_pass")
+    )
+    
+    if st.button("Test Connection", use_container_width=True):
+        success, msg = test_neo4j_connection(load_config())
+        if success:
+            st.success(msg)
+        else:
+            st.error(msg)
+            
+    if st.button("Sync Graph with Neo4j", use_container_width=True):
+        cfg = load_config()
+        if save_graph_to_neo4j(st.session_state.graph, cfg):
+            st.success("Graph synchronized with Neo4j!")
+        else:
+            st.error("Sync failed. Check connection settings.")
 
 # --- Application Header ---
 st.title("CortexKG: LLM Knowledge Graph Explorer")
@@ -426,3 +498,8 @@ render_footer(
     developer_name="Pooya Chavoshi",
     github_url="https://github.com/pooyaphoenix/CortexKG"
 )
+
+def update_neo4j_setting(prop_key, ui_key):
+    cfg = load_config()
+    cfg["neo4j"][prop_key] = st.session_state[ui_key]
+    save_config(cfg)
